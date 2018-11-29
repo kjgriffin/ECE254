@@ -94,11 +94,6 @@ int best_fit_memory_init(size_t size)
     first_block->ptr = POOL_BEST + sizeof(mem_ctrl);
     first_block->addr = NULL;
     first_block->state = FREE;
-    //POOL_BEST = first_block;
-
-    print_block(first_block);
-
-    printf("##################\n");
 
 	return 0;
 

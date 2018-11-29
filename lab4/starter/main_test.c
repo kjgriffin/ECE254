@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	if ( algo == 0 ) {
         printf("memory init\n");
 		best_fit_memory_init(1024);	// initizae 1KB, best fit
-        printf("printing...\n");
+        //printf("printing...\n");
         pool_dump(0);
 
 
