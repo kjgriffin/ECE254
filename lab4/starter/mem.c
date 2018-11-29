@@ -32,6 +32,12 @@ void* POOL_WORST;
 
 /* Functions */
 
+void print_block(mem_ctrl* block)
+{
+    printf("<%p>  next[%p] prev[%p] size(%lu) ptr[%p] addr[%p] state(%d)\n",
+               block, block->next, block->prev, block->size, block->ptr, block->addr, (int)block->state);
+}
+
 void pool_dump(void* pool)
 {
     pool = POOL_BEST;
@@ -41,8 +47,7 @@ void pool_dump(void* pool)
    
     while (curr != NULL)
     {
-        printf("<%p>  next[%p] prev[%p] size(%lu) ptr[%p] addr[%p] state(%d)\n",
-                curr, curr->next, curr->prev, curr->size, curr->ptr, curr->addr, (int)curr->state);
+        print_block(curr);
         curr = curr->next;
     }
 
@@ -90,6 +95,10 @@ int best_fit_memory_init(size_t size)
     first_block->addr = NULL;
     first_block->state = FREE;
     //POOL_BEST = first_block;
+
+    print_block(first_block);
+
+    printf("##################\n");
 
 	return 0;
 
