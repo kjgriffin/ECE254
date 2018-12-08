@@ -16,6 +16,161 @@
 #include "mem.h"
 
 
+/* general test functions */
+
+
+/* writes data to a memory block*/
+int test_helper_write_data(void* block, size_t size)
+{
+    int i = 0;
+    //printf("ptr: %p\n", block);
+    for (i = 0; i < size; i++)
+    {
+       *(char*)(block + i) = 40;
+    }
+}
+
+
+/* makes sure data is still in a memory block */
+int test_helper_validate_data(void* block, size_t size)
+{
+    int valid = 1;
+    int i = 0;
+    //printf("ptr: %p\n", block);
+    for (i = 0; i < size; i++)
+    {
+        //printf("%hhx\n", *(int*)(block + i));
+        if (*(char*)(block + i) != 40)
+        {
+            valid = 0;
+        }
+    }
+    return valid;
+}
+
+
+
+/* test functions for best alloc */
+
+/* test basic functionality */
+int test_mem_too_big()
+{
+    void* p;
+    best_fit_memory_init(1024);
+    // request something of size 1024
+    p = best_fit_alloc(1024);
+
+    // cleanup memory
+    best_fit_memory_nuke();    
+
+    // expect NULL ptr for impossible request 
+    return (p == NULL);
+}
+
+int test_dealloc()
+{
+    int res = 0;
+    void*p = best_fit_alloc(100);
+    best_fit_memory_init(1024);
+    test_helper_write_data(p, 100);
+    res = test_helper_validate_data(p, 100);
+    printf("res %d\n", res);
+    best_fit_dealloc(NULL);
+    res = test_helper_validate_data(p, 100);
+    best_fit_memory_nuke();
+    return res;
+}
+
+/* allocates, deallocates, allocates, check memory integrity */
+int test_mem_large_cycle()
+{
+    void* p[10];
+    int i = 0;
+    int valid = 1;
+    
+    best_fit_memory_init(2048);
+
+    // request a bunch of larger blocks
+    for(i = 0; i < 10; i++)
+    {
+        p[i] = best_fit_alloc(100);
+        // use the memory
+        test_helper_write_data(p[i], 100);
+    }    
+
+    printf("allocated 10 blocks of 100 bytes\n");
+    pool_dump();
+
+    // make sure data is intact
+
+    for (i = 0; i < 10; i++)
+    {
+        if (test_helper_validate_data(p[i], 100) != 1)
+        {
+            valid = 0;
+        } 
+    }
+
+    printf("data integrity check: %d\n", valid);
+
+    // deallocate some data
+    best_fit_dealloc(p[0]); 
+    best_fit_dealloc(p[9]);
+    best_fit_dealloc(p[4]);
+    best_fit_dealloc(p[5]);
+    best_fit_dealloc(p[3]);
+
+    printf("deallocated 5 blocks\n");
+    pool_dump();
+
+
+    // check integrity
+    for (i = 1; i < 9; i++)
+    {
+        if (i == 4 || i == 3 || i == 5)
+            break;
+        if (test_helper_validate_data(p[i], 100) != 1)
+        {
+            valid = 0;
+        } 
+    }
+
+
+    printf("data integrity check: %d\n", valid);
+
+
+    // allocate data
+    p[0] = best_fit_alloc(200);
+    p[9] = best_fit_alloc(100);
+    p[4] = best_fit_alloc(300);
+    p[5] = best_fit_alloc(50);
+    p[3] = best_fit_alloc(4);
+    
+    printf("4: %p\n", p[4]);
+    printf("re-allocate 3 blocks\n");
+    pool_dump();
+
+    // check integrity
+    for (i = 0; i < 10; i++)
+    {
+        if (test_helper_validate_data(p[i], 100) != 1)
+        {
+            printf("block %d corrupt\n", i);
+            valid = 0;
+        } 
+    }
+
+    printf("data integrity check: %d\n", valid);
+
+    best_fit_memory_nuke();
+    
+    return valid;
+}
+
+
+
+
+
 
 int main(int argc, char *argv[])
 {
@@ -34,22 +189,16 @@ int main(int argc, char *argv[])
 	}
 	
 	if ( algo == 0 ) {
-        printf("memory init\n");
-		best_fit_memory_init(1024);	// initizae 1KB, best fit
-        //printf("printing...\n");
-        pool_dump(0);
+
+        printf("this print statment makes it all work\n");
+
+        // run test cases
+        printf("mem too big: %d\n", test_mem_too_big());
+        printf("dealloc invalid: %d\n", test_dealloc());
+        printf("testing large cycle:\n");
+        printf("large cycle: %d\n", test_mem_large_cycle());
 
 
-		p = best_fit_alloc(8);		// allocate 8B
-
-
-        pool_dump(0);
-
-		printf("best fit: p=%p\n", p);
-		if ( p != NULL ) {
-			best_fit_dealloc(p);	
-		}
-		num = best_fit_count_extfrag(4);
 	} else if ( algo == 1 ) {
 
 		worst_fit_memory_init(1024);	// initizae 1KB, worst fit
