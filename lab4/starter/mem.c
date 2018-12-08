@@ -155,8 +155,8 @@ void *best_fit_alloc(size_t size)
         curr = curr->next;
     }
 
-    //printf("####alloc soln\n");
-    //print_block(soln);
+    printf("####alloc soln\n");
+    print_block(soln);
 
     // make sure solution works
     if (soln->size > size + sizeof(mem_ctrl) + calc_byte_offset(soln->ptr))
@@ -194,7 +194,7 @@ void *best_fit_alloc(size_t size)
 
         return soln->addr; 
     }
-    else if (soln->size > size + calc_byte_offset(soln->ptr))
+    else if (soln->size >= size + calc_byte_offset(soln->ptr))
     {
         // just use this node
         // re-compute byte aligned pointer
@@ -265,7 +265,7 @@ void best_fit_dealloc(void *ptr)
             //print_block(before);
 
             // compute new space for before block
-            before->size = before->size + dealloc->size + calc_byte_offset(dealloc->ptr) + sizeof(mem_ctrl); 
+            before->size = before->size + dealloc->size + sizeof(mem_ctrl); 
             // remove dealloc from linked list
             before->next = dealloc->next;
             if (dealloc->next != NULL)
@@ -291,7 +291,7 @@ void best_fit_dealloc(void *ptr)
             //print_block(after);
 
             // compute new space for dealloc block
-            dealloc->size = dealloc->size + after->size + calc_byte_offset(after->ptr) + sizeof(mem_ctrl);
+            dealloc->size = dealloc->size + after->size + sizeof(mem_ctrl);
             // remove after from linked list
             dealloc->next = after->next;
             if (after->next != NULL)
