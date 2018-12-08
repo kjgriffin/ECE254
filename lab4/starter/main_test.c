@@ -374,9 +374,60 @@ int test_best_mem_large_cycle()
 }
 
 
+void compute_frag(size_t min, size_t max, size_t step)
+{
+    size_t i;
+    for (i = min; i < max; i += step)
+    {
+        printf("best frag @ %d: %d\n", i, best_fit_count_extfrag(i));
+    }
+    for (i = min; i < max; i += step)
+    {
+        printf("worst frag @ %d: %d\n", i, worst_fit_count_extfrag(i));
+    }
+}
+
+void test_small_allocs()
+{
+    int i, j, k;
+    void* pb[100];
+    void* pw[100];
+    best_fit_memory_init(1000000);
+    worst_fit_memory_init(1000000);
+    printf("init\n");
+    // make a bunch of small allocations
+    for (i = 0; i < 100; i++)
+    {
+        printf("%d\n", i);
+        pool_dump();
+        pool_dump_worst();
+        pb[i] = best_fit_alloc(10 * i);
+        pw[i] = worst_fit_alloc(10 * i);
+    }
+
+    printf("alloced\n");
+    // deallocate a handful of blocks
+    for (i = 0; i < 100; i+=3)
+    {
+        best_fit_dealloc(pb[i]);
+        worst_fit_dealloc(pw[i]);
+    }
+
+    printf("dealloced\n");
+    // reallocate a handful of blocks
+    for (i = 0; i < 50; i++)
+    {
+        best_fit_alloc(20 * i);
+        worst_fit_alloc(20 * i);
+    }
+   
+    printf("realloced\n");
+    compute_frag(1, 1024, 100);
+}
+
 void test_all_frag_data()
 {
-
+    test_small_allocs();
 }
 
 
@@ -390,7 +441,7 @@ int main(int argc, char *argv[])
 	if (argc != 2) {
 		fprintf(stderr, "Usage: %s <0/1>. 0 for best fit and 1 for worst fit \n", argv[0]);
 		exit (1);
-	} else if (!strcmp(argv[1], "1") || !strcmp(argv[1], "0")) {
+	} else if (!strcmp(argv[1], "1") || !strcmp(argv[1], "0") || !strcmp(argv[1], "2")) {
 		algo = atoi(argv[1]);
 	} else {
 		fprintf(stderr, "Invalid argument, please specify 0 or 1\n");
@@ -398,8 +449,6 @@ int main(int argc, char *argv[])
 	}
 	
 	if ( algo == 0 ) {
-
-        printf("this print statment makes it all work\n");
 
 
         // run test cases
@@ -411,8 +460,6 @@ int main(int argc, char *argv[])
 
 	} else if ( algo == 1 ) {
 
-        printf("this print statment makes it all work\n");
-    
 
         // run test cases
         printf("mem too big: %d\n", test_worst_mem_too_big());
@@ -424,7 +471,7 @@ int main(int argc, char *argv[])
 	} else {
         
         // run frag test
-
+        test_all_frag_data();
 	}
 
 

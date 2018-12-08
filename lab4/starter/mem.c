@@ -30,8 +30,8 @@ typedef struct mem_ctrl
 } mem_ctrl;
 
 /* global variables */
-void* POOL_BEST;
-void* POOL_WORST;
+static volatile void* POOL_BEST;
+static volatile void* POOL_WORST;
 
 /* Functions */
 
@@ -121,10 +121,13 @@ int best_fit_memory_init(size_t size)
         return -1;
     } 
 
+    printf("best %p\n", POOL_BEST);
+    printf("worst %p\n", POOL_WORST);
+    
 
-    POOL_BEST = malloc(sizeof(size));
-    //printf("malloc %p\n", POOL_BEST);
-    //printf("size %lu\n", sizeof(mem_ctrl));
+    POOL_BEST = malloc(size);
+    // write to end of pool_best
+    ///printf("size %lu\n", sizeof(mem_ctrl));
     // setup first node
     mem_ctrl* first_block = POOL_BEST;
 
@@ -132,6 +135,7 @@ int best_fit_memory_init(size_t size)
     first_block->next = NULL;
     first_block->size = size - sizeof(mem_ctrl);
     first_block->ptr = POOL_BEST + sizeof(mem_ctrl);
+    printf("%p\n", first_block->ptr);
     first_block->addr = NULL;
     first_block->state = FREE;
 
@@ -147,9 +151,12 @@ int worst_fit_memory_init(size_t size)
         return -1;
     } 
 
+    printf("best %p\n", POOL_BEST);
+    printf("worst %p\n", POOL_WORST);
 
-    POOL_WORST = malloc(sizeof(size));
-    //printf("malloc %p\n", POOL_BEST);
+
+    POOL_WORST = malloc(size);
+    printf("malloc %p\n", POOL_WORST);
     //printf("size %lu\n", sizeof(mem_ctrl));
     // setup first node
     mem_ctrl* first_block = POOL_WORST;
