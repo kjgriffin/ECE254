@@ -1,2 +1,3 @@
 #!/usr/bin/env bash
 ./main_test.out 0
+./main_test.out 1

@@ -36,6 +36,7 @@ void* POOL_WORST;
 /* Functions */
 
 void best_fit_memory_nuke();
+void worst_fit_memory_nuke();
 
 void print_block(mem_ctrl* block)
 {
@@ -49,6 +50,25 @@ void pool_dump(void* pool)
 {
 #ifdef POOLDUMP
     pool = POOL_BEST;
+    printf("*******************\n");
+    printf("POOL DUMP %p\n", pool);
+    mem_ctrl* curr = pool;
+   
+    while (curr != NULL)
+    {
+        printf("<%p>  next[%p] prev[%p] size(%lu) ptr[%p] addr[%p] state(%d)\n",
+              curr, curr->next, curr->prev, curr->size, curr->ptr, curr->addr, (int)curr->state);
+        curr = curr->next;
+    }
+
+    printf("********************\n");
+#endif
+}
+
+void pool_dump_worst(void* pool)
+{
+#ifdef POOLDUMP
+    pool = POOL_WORST;
     printf("*******************\n");
     printf("POOL DUMP %p\n", pool);
     mem_ctrl* curr = pool;
@@ -87,6 +107,11 @@ void best_fit_memory_nuke()
     free(POOL_BEST); 
 }
 
+void worst_fit_memory_nuke()
+{
+    free(POOL_WORST); 
+}
+
 /* memory initializer */
 int best_fit_memory_init(size_t size)
 {
@@ -117,8 +142,25 @@ int best_fit_memory_init(size_t size)
 int worst_fit_memory_init(size_t size)
 {
 
-	// To be completed by students
-	// You call malloc once here to obtain the memory to be managed.
+    if (size <= sizeof(mem_ctrl))
+    {
+        return -1;
+    } 
+
+
+    POOL_WORST = malloc(sizeof(size));
+    //printf("malloc %p\n", POOL_BEST);
+    //printf("size %lu\n", sizeof(mem_ctrl));
+    // setup first node
+    mem_ctrl* first_block = POOL_WORST;
+
+    first_block->prev = NULL;
+    first_block->next = NULL;
+    first_block->size = size - sizeof(mem_ctrl);
+    first_block->ptr = POOL_WORST + sizeof(mem_ctrl);
+    first_block->addr = NULL;
+    first_block->state = FREE;
+
 	return 0;
 
 }
@@ -155,8 +197,8 @@ void *best_fit_alloc(size_t size)
         curr = curr->next;
     }
 
-    printf("####alloc soln\n");
-    print_block(soln);
+    //printf("####alloc soln\n");
+    //print_block(soln);
 
     // make sure solution works
     if (soln->size > size + sizeof(mem_ctrl) + calc_byte_offset(soln->ptr))
@@ -219,8 +261,93 @@ void *best_fit_alloc(size_t size)
 
 void *worst_fit_alloc(size_t size)
 {
-	// To be completed by students
+    // pointer to solution
+    mem_ctrl* soln = POOL_WORST;
+    size_t biggest = 0;
+    
+    // iterate throught the linked list to find the smallest block that fits the requested size
+    mem_ctrl* curr = POOL_WORST;
+    while(curr != NULL)
+    {
+        //printf("searching: ");
+        //print_block(curr);
+
+        // check if valid solution
+        if (curr->size >= size + calc_byte_offset(curr->ptr))
+        {
+            //printf("\talloc trying\n");
+
+            // check if smaller and available
+            if (curr->size > biggest && curr->state == FREE)
+            {
+                //printf("\t\talloc updating: ");
+                //print_block(curr);
+
+                soln = curr;
+                biggest = soln->size;
+            }
+        } 
+        curr = curr->next;
+    }
+
+    //printf("####alloc soln\n");
+    //print_block(soln);
+
+    // make sure solution works
+    if (soln->size > size + sizeof(mem_ctrl) + calc_byte_offset(soln->ptr))
+    {
+        //printf("splitting block\n");
+        // make new node for remainder
+        mem_ctrl* remainder = soln->ptr + size + calc_byte_offset(soln->ptr);
+        //printf("allocate remainder @%p\n", remainder);
+        // compute new nodes size
+        remainder->size = soln->size - size - calc_byte_offset(soln->ptr) - sizeof(mem_ctrl);
+        // update pointer for remainder block
+        remainder->ptr = (void*)((size_t)remainder + sizeof(mem_ctrl));
+        //printf("remainder block @%p\n", remainder->ptr);
+        remainder->addr = NULL;
+        remainder->state = FREE;
+
+        //update solution
+        soln->size = calc_byte_offset(soln->ptr) + size;
+        soln->addr = calc_byte_offset(soln->ptr) + soln->ptr;
+        soln->state = ALLOCATED;
+
+
+        // update linked list
+        remainder->next = soln->next;
+        if (remainder->next != NULL)
+        {
+            remainder->next->prev = remainder;
+        }
+        else
+        {
+            remainder->next = NULL;
+        }
+        remainder->prev = soln;
+        soln->next = remainder;
+
+        return soln->addr; 
+    }
+    else if (soln->size >= size + calc_byte_offset(soln->ptr))
+    {
+        // just use this node
+        // re-compute byte aligned pointer
+        soln->addr = soln->ptr + calc_byte_offset(soln->ptr);
+        // mark used
+        soln->state = ALLOCATED;
+        // return the address
+        return soln->addr;
+    }
+    else
+    {
+        // no room
+        return NULL;
+    }
+
+
 	return NULL;
+
 }
 
 /* memory de-allocator */
@@ -306,8 +433,81 @@ void best_fit_dealloc(void *ptr)
 
 void worst_fit_dealloc(void *ptr) 
 {
+    // traverse the list and find the requested memory block, mark as free
+    mem_ctrl* curr = POOL_WORST;
+    mem_ctrl* dealloc = NULL;
+    while(curr != NULL)
+    {
+        if (curr->addr == ptr)
+        {
+            curr->state = FREE;
+            dealloc = curr;
+            break;
+        }
+        curr = curr->next;
+    }
 
-	// To be completed by students
+    // do nothing if not valid
+    if (dealloc == NULL)
+    {
+        return;
+    }
+   
+    // mark free
+    dealloc->state = FREE; 
+
+
+    // check the next and prev block's to see if they are free, if so coalless
+    mem_ctrl* before = NULL;
+
+
+    // coaless before if empty
+    if (dealloc->prev != NULL)
+    {
+        before = dealloc->prev;
+        if (before->state == FREE)
+        {
+            // coalless before
+            //printf("coalless before\n");
+            //print_block(before);
+
+            // compute new space for before block
+            before->size = before->size + dealloc->size + sizeof(mem_ctrl); 
+            // remove dealloc from linked list
+            before->next = dealloc->next;
+            if (dealloc->next != NULL)
+            {
+                dealloc->next->prev = before;
+            }
+
+            // update dealloc to point to before
+            dealloc = before;
+        }
+    }
+
+
+    // coaless after if empty
+    mem_ctrl* after = NULL;
+    if (dealloc->next != NULL)
+    {
+        after = dealloc->next;
+        if (after->state == FREE)
+        {
+            // coalless after
+            //printf("coalless after\n");
+            //print_block(after);
+
+            // compute new space for dealloc block
+            dealloc->size = dealloc->size + after->size + sizeof(mem_ctrl);
+            // remove after from linked list
+            dealloc->next = after->next;
+            if (after->next != NULL)
+            {
+                after->next->prev = dealloc;
+            }
+        }
+    }
+
 	return;
 }
 
@@ -333,6 +533,18 @@ int best_fit_count_extfrag(size_t size)
 
 int worst_fit_count_extfrag(size_t size)
 {
-	// To be completed by students
-	return 0;
+    // To be completed by students
+    int frags = 0;
+    mem_ctrl* curr = POOL_WORST;
+    while(curr != NULL)
+    {
+        if (curr->size < size && curr->state == FREE)
+        {
+            frags++;
+        }
+        curr = curr->next;
+    } 
+
+	return frags;
+
 }

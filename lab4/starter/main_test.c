@@ -39,7 +39,7 @@ int test_helper_validate_data(void* block, size_t size)
     //printf("ptr: %p\n", block);
     for (i = 0; i < size; i++)
     {
-        printf("%hhx,", *(int*)(block + i));
+        //printf("%hhx,", *(int*)(block + i));
         if (*(char*)(block + i) != 40)
         {
             valid = 0;
@@ -48,12 +48,172 @@ int test_helper_validate_data(void* block, size_t size)
     return valid;
 }
 
+/* test functions for worst alloc */
+int test_worst_mem_too_big()
+{
+    void* p;
+    worst_fit_memory_init(1024);
+    // request something of size 1024
+    p = worst_fit_alloc(1024);
+
+    // cleanup memory
+    worst_fit_memory_nuke();    
+
+    // expect NULL ptr for impossible request 
+    return (p == NULL);
+}
+
+int test_worst_dealloc()
+{
+    int res = 0;
+    void*p;
+    worst_fit_memory_init(1024);
+    p = worst_fit_alloc(100);
+    test_helper_write_data(p, 100);
+    res = test_helper_validate_data(p, 100);
+    worst_fit_dealloc(NULL);
+    res = test_helper_validate_data(p, 100);
+    worst_fit_memory_nuke();
+    return res;
+}
+
+/* allocates, deallocates, allocates, check memory integrity */
+int test_worst_mem_large_cycle()
+{
+    void* p[10];
+    int i = 0;
+    int valid = 1;
+    
+    worst_fit_memory_init(2048);
+
+    // request a bunch of larger blocks
+    for(i = 0; i < 10; i++)
+    {
+        p[i] = worst_fit_alloc(100);
+        // use the memory
+        test_helper_write_data(p[i], 100);
+    }    
+
+    //printf("allocated 10 blocks of 100 bytes\n");
+    //pool_dump();
+
+    // make sure data is intact
+
+    for (i = 0; i < 10; i++)
+    {
+        if (test_helper_validate_data(p[i], 100) != 1)
+        {
+            valid = 0;
+        } 
+    }
+
+    //printf("data integrity check: %d\n", valid);
+
+    // deallocate some data
+    worst_fit_dealloc(p[0]); 
+    worst_fit_dealloc(p[9]);
+    worst_fit_dealloc(p[4]);
+    worst_fit_dealloc(p[5]);
+    worst_fit_dealloc(p[3]);
+
+    //printf("deallocated 5 blocks\n");
+    //pool_dump();
+
+
+    //printf("check integrity after dealloc\n");
+    // check integrity
+    for (i = 1; i < 9; i++)
+    {
+        if (i == 0, i == 3 || i == 4 || i == 5 || i == 9)
+            break;
+        //printf("****check block %d\n", i);
+        if (test_helper_validate_data(p[i], 100) != 1)
+        {
+            valid = 0;
+        } 
+        //printf("\n****\n");
+    }
+
+
+    //printf("0000xdata integrity check: %d\n", valid);
+
+
+    // allocate data
+    p[0] = worst_fit_alloc(200);
+    //printf("0:%p\n", p[0]);
+    test_helper_write_data(p[0], 200);
+    //pool_dump();
+    p[9] = worst_fit_alloc(100);
+    //printf("9:%p\n", p[9]);
+    test_helper_write_data(p[9], 100);
+    //pool_dump();
+    p[4] = worst_fit_alloc(300);
+    //printf("4:%p\n", p[4]);
+    test_helper_write_data(p[4], 300);
+    p[5] = worst_fit_alloc(50);
+    //printf("5:%p\n", p[5]);
+    test_helper_write_data(p[5], 50);
+    p[3] = worst_fit_alloc(4);
+    //printf("3:%p\n", p[3]);
+    test_helper_write_data(p[3], 4);
+
+    //printf("re-allocate 5 blocks\n");
+    //pool_dump();
+
+    // check integrity
+    //printf("****\ncheck block: %d\n", 0);
+    valid = (test_helper_validate_data(p[0], 200) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[0], 200)); 
+
+    //printf("****\ncheck block: %d\n", 1);
+    valid = (test_helper_validate_data(p[1], 100) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[1], 100));
+
+    //printf("****\ncheck block: %d\n", 2);
+    valid = (test_helper_validate_data(p[2], 100) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[2], 100));
+
+    //printf("****\ncheck block: %d\n", 3);
+    valid = (test_helper_validate_data(p[3], 4) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[3], 4));
+
+    //printf("****\ncheck block: %d\n", 4);
+    valid = (test_helper_validate_data(p[4], 300) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[4], 300));
+
+    //printf("****\ncheck block: %d\n", 5);
+    valid = (test_helper_validate_data(p[5], 50) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[5], 50));
+
+    //printf("****\ncheck block: %d\n", 6);
+    valid = (test_helper_validate_data(p[6], 100) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[6], 100));
+
+    //printf("****\ncheck block: %d\n", 7);
+    valid = (test_helper_validate_data(p[7], 100) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[7], 100));
+
+    //printf("****\ncheck block: %d\n", 8);
+    valid = (test_helper_validate_data(p[8], 100) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[8], 100));
+
+    //printf("****\ncheck block: %d\n", 9);
+    valid = (test_helper_validate_data(p[9], 100) == 1) ? valid : 0;
+    //printf("\nvalid %d\n", test_helper_validate_data(p[9], 100));
+
+
+    //printf("data integrity check: %d\n", valid);
+
+    worst_fit_memory_nuke();
+    
+    return valid;
+}
 
 
 /* test functions for best alloc */
 
 /* test basic functionality */
-int test_mem_too_big()
+int test_best_mem_too_big()
 {
     void* p;
     best_fit_memory_init(1024);
@@ -67,14 +227,14 @@ int test_mem_too_big()
     return (p == NULL);
 }
 
-int test_dealloc()
+int test_best_dealloc()
 {
     int res = 0;
-    void*p = best_fit_alloc(100);
+    void* p;
     best_fit_memory_init(1024);
+    p = best_fit_alloc(100);
     test_helper_write_data(p, 100);
     res = test_helper_validate_data(p, 100);
-    printf("res %d\n", res);
     best_fit_dealloc(NULL);
     res = test_helper_validate_data(p, 100);
     best_fit_memory_nuke();
@@ -82,7 +242,7 @@ int test_dealloc()
 }
 
 /* allocates, deallocates, allocates, check memory integrity */
-int test_mem_large_cycle()
+int test_best_mem_large_cycle()
 {
     void* p[10];
     int i = 0;
@@ -98,8 +258,8 @@ int test_mem_large_cycle()
         test_helper_write_data(p[i], 100);
     }    
 
-    printf("allocated 10 blocks of 100 bytes\n");
-    pool_dump();
+    //printf("allocated 10 blocks of 100 bytes\n");
+    //pool_dump();
 
     // make sure data is intact
 
@@ -111,7 +271,7 @@ int test_mem_large_cycle()
         } 
     }
 
-    printf("data integrity check: %d\n", valid);
+    //printf("data integrity check: %d\n", valid);
 
     // deallocate some data
     best_fit_dealloc(p[0]); 
@@ -120,93 +280,93 @@ int test_mem_large_cycle()
     best_fit_dealloc(p[5]);
     best_fit_dealloc(p[3]);
 
-    printf("deallocated 5 blocks\n");
-    pool_dump();
+    //printf("deallocated 5 blocks\n");
+    //pool_dump();
 
 
-    printf("check integrity after dealloc\n");
+    //printf("check integrity after dealloc\n");
     // check integrity
     for (i = 1; i < 9; i++)
     {
         if (i == 0, i == 3 || i == 4 || i == 5 || i == 9)
             break;
-        printf("****check block %d\n", i);
+        //printf("****check block %d\n", i);
         if (test_helper_validate_data(p[i], 100) != 1)
         {
             valid = 0;
         } 
-        printf("\n****\n");
+        //printf("\n****\n");
     }
 
 
-    printf("0000xdata integrity check: %d\n", valid);
+    //printf("0000xdata integrity check: %d\n", valid);
 
 
     // allocate data
     p[0] = best_fit_alloc(200);
-    printf("0:%p\n", p[0]);
+    //printf("0:%p\n", p[0]);
     test_helper_write_data(p[0], 200);
-    pool_dump();
+    //pool_dump();
     p[9] = best_fit_alloc(100);
-    printf("9:%p\n", p[9]);
+    //printf("9:%p\n", p[9]);
     test_helper_write_data(p[9], 100);
-    pool_dump();
+    //pool_dump();
     p[4] = best_fit_alloc(300);
-    printf("4:%p\n", p[4]);
+    //printf("4:%p\n", p[4]);
     test_helper_write_data(p[4], 300);
     p[5] = best_fit_alloc(50);
-    printf("5:%p\n", p[5]);
+    //printf("5:%p\n", p[5]);
     test_helper_write_data(p[5], 50);
     p[3] = best_fit_alloc(4);
-    printf("3:%p\n", p[3]);
+    //printf("3:%p\n", p[3]);
     test_helper_write_data(p[3], 4);
 
-    printf("re-allocate 5 blocks\n");
-    pool_dump();
+    //printf("re-allocate 5 blocks\n");
+    //pool_dump();
 
     // check integrity
-    printf("****\ncheck block: %d\n", 0);
+    //printf("****\ncheck block: %d\n", 0);
     valid = (test_helper_validate_data(p[0], 200) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[0], 200)); 
+    //printf("\nvalid %d\n", test_helper_validate_data(p[0], 200)); 
 
-    printf("****\ncheck block: %d\n", 1);
+    //printf("****\ncheck block: %d\n", 1);
     valid = (test_helper_validate_data(p[1], 100) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[1], 100));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[1], 100));
 
-    printf("****\ncheck block: %d\n", 2);
+    //printf("****\ncheck block: %d\n", 2);
     valid = (test_helper_validate_data(p[2], 100) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[2], 100));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[2], 100));
 
-    printf("****\ncheck block: %d\n", 3);
+    //printf("****\ncheck block: %d\n", 3);
     valid = (test_helper_validate_data(p[3], 4) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[3], 4));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[3], 4));
 
-    printf("****\ncheck block: %d\n", 4);
+    //printf("****\ncheck block: %d\n", 4);
     valid = (test_helper_validate_data(p[4], 300) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[4], 300));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[4], 300));
 
-    printf("****\ncheck block: %d\n", 5);
+    //printf("****\ncheck block: %d\n", 5);
     valid = (test_helper_validate_data(p[5], 50) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[5], 50));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[5], 50));
 
-    printf("****\ncheck block: %d\n", 6);
+    //printf("****\ncheck block: %d\n", 6);
     valid = (test_helper_validate_data(p[6], 100) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[6], 100));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[6], 100));
 
-    printf("****\ncheck block: %d\n", 7);
+    //printf("****\ncheck block: %d\n", 7);
     valid = (test_helper_validate_data(p[7], 100) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[7], 100));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[7], 100));
 
-    printf("****\ncheck block: %d\n", 8);
+    //printf("****\ncheck block: %d\n", 8);
     valid = (test_helper_validate_data(p[8], 100) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[8], 100));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[8], 100));
 
-    printf("****\ncheck block: %d\n", 9);
+    //printf("****\ncheck block: %d\n", 9);
     valid = (test_helper_validate_data(p[9], 100) == 1) ? valid : 0;
-    printf("\nvalid %d\n", test_helper_validate_data(p[9], 100));
+    //printf("\nvalid %d\n", test_helper_validate_data(p[9], 100));
 
 
-    printf("data integrity check: %d\n", valid);
+    //printf("data integrity check: %d\n", valid);
 
     best_fit_memory_nuke();
     
@@ -214,13 +374,15 @@ int test_mem_large_cycle()
 }
 
 
+void test_all_frag_data()
+{
 
+}
 
 
 
 int main(int argc, char *argv[])
 {
-	int num = 0;
 	int algo = 0; // default algorithm to test is best fit  
 	void *p, *q;
     void* ptr[5];
@@ -238,53 +400,33 @@ int main(int argc, char *argv[])
 	if ( algo == 0 ) {
 
         printf("this print statment makes it all work\n");
-        // test double dealloc
-        /*
-        best_fit_memory_init(1024);
-        ptr[0] = best_fit_alloc(100); 
-        ptr[1] = best_fit_alloc(200);
-        ptr[2] = best_fit_alloc(200);
-        ptr[3] = best_fit_alloc(10);
-        ptr[4] = best_fit_alloc(5);
-        pool_dump();
-        
-        best_fit_dealloc(ptr[2]);
-        printf("dealloc 2\n");
-        pool_dump();
-        best_fit_dealloc(ptr[4]);
-        printf("dealloc 4\n");
-        pool_dump();
-        best_fit_dealloc(ptr[3]);
-        printf("dealloc 3\n");
-        pool_dump();
-
-        return;
-        */
 
 
         // run test cases
-        printf("mem too big: %d\n", test_mem_too_big());
-        printf("dealloc invalid: %d\n", test_dealloc());
+        printf("mem too big: %d\n", test_best_mem_too_big());
+        printf("dealloc invalid: %d\n", test_best_dealloc());
         printf("testing large cycle:\n");
-        printf("large cycle: %d\n", test_mem_large_cycle());
+        printf("large cycle: %d\n", test_best_mem_large_cycle());
 
 
 	} else if ( algo == 1 ) {
 
-		worst_fit_memory_init(1024);	// initizae 1KB, worst fit
+        printf("this print statment makes it all work\n");
+    
 
-		q = worst_fit_alloc(8);		// allocate 8B
-		printf("worst fit: q=%p\n", q);
-		if ( q != NULL ) {
-			worst_fit_dealloc(q);	
-		}
-		num = worst_fit_count_extfrag(4);
+        // run test cases
+        printf("mem too big: %d\n", test_worst_mem_too_big());
+        printf("dealloc invalid: %d\n", test_worst_dealloc());
+        printf("testing large cycle:\n");
+        printf("large cycle: %d\n", test_worst_mem_large_cycle());
+
+
 	} else {
-		fprintf(stderr, "Should not reach here!\n");
-		exit(1);
+        
+        // run frag test
+
 	}
 
-	printf("num = %d\n", num);
 
 	return 0;
 }
